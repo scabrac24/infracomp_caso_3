@@ -4,6 +4,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class CryptoMining {
 
@@ -69,6 +70,9 @@ public class CryptoMining {
 }
 
 class MineTask extends Thread {
+    private static final AtomicLong totalHashOperations = new AtomicLong(0);
+    private static long timeHash  = 0;
+     static AtomicLong totalTimeSpentHashing = new AtomicLong(0);
     private final String inputString;
     private final int numZeros;
     private final AtomicBoolean solutionFound;
@@ -90,22 +94,40 @@ class MineTask extends Thread {
     @Override
 public void run() {
     try {
-        MessageDigest md = MessageDigest.getInstance(algorithm);
-        String target = String.format("%0" + numZeros + "d", 0);
+            MessageDigest md = MessageDigest.getInstance(algorithm);
+            String target = String.format("%0" + numZeros + "d", 0);
 
-        for (int v = startRange; v < endRange && !solutionFound.get(); v++) {
-            String data = inputString + getAlphabeticString(v);
-            byte[] hash = md.digest(data.getBytes());
-            String strHash = bytesToHex(hash);
+            for (int v = startRange; v < endRange && !solutionFound.get(); v++) {
+                String data = inputString + getAlphabeticString(v);
 
-            if (strHash.startsWith(target)) {
+                long startTimeHash = System.nanoTime(); 
+                md.update(data.getBytes());
+                byte[] digest = md.digest();
+                long endTimeHash = System.nanoTime(); 
+
+                totalHashOperations.incrementAndGet();
+
+                totalTimeSpentHashing.set(totalTimeSpentHashing.get() + (endTimeHash - startTimeHash));
+
+            if (bytesToHex(digest).startsWith(target )) {
                 solutionFound.set(true);
                 long endTime = System.currentTimeMillis();
                 System.out.println("Cadena de entrada: " + inputString);
                 System.out.println("Valor v: " + v);
-                System.out.println("Hash: " + strHash);
+                System.out.println("Hash: " + bytesToHex(digest));
                 System.out.println("Tiempo de búsqueda: " + (endTime - startTime) + " ms");
-                // Acá va a esperar a que solutionfound sea verdaderooo.
+                double processorSpeedGHz = 2.1; 
+                long totalHashes = MineTask.getTotalHashOperations();
+                long totalTimeNanos = endTime - startTime; 
+                double totalTimeSeconds = totalTimeNanos / 1e3;
+                long averageTimePerHash = totalTimeSpentHashing.get() / totalHashOperations.get();
+
+                double cyclesPerHash = (processorSpeedGHz * 1e9) * averageTimePerHash ;
+                System.out.println("Velocidad del procesador: " + processorSpeedGHz + " GHz");
+                System.out.println("Total de operaciones de hash: " + totalHashes);
+                System.out.println("Tiempo total de ejecución (segundos): " + totalTimeSeconds);
+                System.out.println("Ciclos de procesador promedio por hash: " + cyclesPerHash);
+
             }
 
             if (solutionFound.get()) {
@@ -117,7 +139,9 @@ public void run() {
         e.printStackTrace();
     }
 }
-
+    public static long getTotalHashOperations() {
+        return totalHashOperations.get();
+    }
 
     private String getAlphabeticString(int value) {
         StringBuilder sb = new StringBuilder();
